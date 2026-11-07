@@ -14,7 +14,7 @@
   let latestSimulation = null;
   let lastMarketData = null;
 
-  const inputIds = ["price", "dividend", "desiredShares", "incomeGoal", "inflation", "monthlyContribution"];
+  const inputIds = ["price", "dividend", "desiredShares", "incomeGoal", "inflation", "monthlyContribution", "initialShares", "priceGrowth", "dividendGrowth", "stress"];
   function loadSettings() {
     try {
       const saved = JSON.parse(localStorage.getItem("mxrf11-settings") || "{}");
@@ -30,7 +30,9 @@
     return {
       scenario, price: Number($("price").value), dividend: Number($("dividend").value),
       desiredShares: Number($("desiredShares").value), inflation: Number($("inflation").value),
-      monthlyContribution: Number($("monthlyContribution").value)
+      monthlyContribution: Number($("monthlyContribution").value),
+      initialShares: Number($("initialShares").value) || 0, priceGrowth: Number($("priceGrowth").value) || 0,
+      dividendGrowth: Number($("dividendGrowth").value) || 0, stress: Number($("stress").value) || 0
     };
   }
   function render() {
@@ -45,6 +47,8 @@
     }
     latestSimulation = result;
     latestRows = result.rows;
+    const gap = result.startShares - result.magicShares;
+    $("magicGap").textContent = !c.initialShares ? "" : gap < 0 ? "Faltam " + integer(-gap) + " cotas para o número mágico." : gap > 0 ? "Você está " + integer(gap) + " cotas acima do número mágico." : "Você está exatamente no número mágico.";
     $("magicShares").textContent = integer(result.magicShares) + " cotas";
     $("initialInvestment").textContent = money(result.initialInvestment);
     const goal = Math.max(0, Number($("incomeGoal").value) || 0);
@@ -76,7 +80,7 @@
     if (scenario === "nominal") {
       cards = [
         ["Você coloca (1 vez)", money(result.initialInvestment)],
-        ["Cotas no início", integer(result.magicShares)],
+        ["Cotas no início", integer(result.startShares)],
         ["Cotas no mês 360", integer(last.sharesAtEnd)],
         ["Renda no mês 360", money(last.sharesAtEnd * c.dividend)],
         ["Patrimônio no mês 360", money(last.nominalWealth)],
@@ -85,7 +89,7 @@
     } else if (scenario === "inflation") {
       cards = [
         ["Você coloca (1 vez)", money(result.initialInvestment)],
-        ["Cotas no início", integer(result.magicShares)],
+        ["Cotas no início", integer(result.startShares)],
         ["Cotas no mês 360", integer(last.sharesAtEnd)],
         ["Renda nominal", money(last.sharesAtEnd * c.dividend)],
         ["Renda real", money(last.realIncome)],
@@ -162,6 +166,26 @@
     link.href = url; link.download = "MXRF11-" + scenario + "-360-meses.csv";
     document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
   }
+  function toggleAvg() { $("use12m").classList.toggle("hidden", !(lastMarketData && lastMarketData.dividend12m > 0)); }
+  function useAvg() {
+    if (!(lastMarketData && lastMarketData.dividend12m > 0)) return;
+    $("dividend").value = Number(lastMarketData.dividend12m).toFixed(3);
+    try { localStorage.setItem("mxrf11-manual", "1"); } catch (_) {}
+    render();
+  }
+  function planGoal() {
+    const base = config(), years = Math.min(30, Math.max(1, Number($("planYears").value) || 10)), goal = Number($("incomeGoal").value) || 0;
+    const ok = (ap) => { const r = MXRFCalculator.simulate({ ...base, scenario: "contributions", monthlyContribution: ap }); return r.rows[years * 12 - 1].realIncome >= goal; };
+    const out = $("planOut");
+    try {
+      if (!(goal > 0)) { out.textContent = "Informe uma meta de renda maior que zero."; return; }
+      if (ok(0)) { out.textContent = "Em " + years + " anos a meta já é atingida sem nenhum aporte."; return; }
+      let lo = 0, hi = 100000;
+      if (!ok(hi)) { out.textContent = "Mesmo com R$ 100.000 por mês a meta não é atingida nesse prazo."; return; }
+      for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (ok(mid)) hi = mid; else lo = mid; }
+      out.textContent = "Para atingir " + money(goal) + " por mês (valores de hoje) em " + years + " anos, aporte cerca de " + money(Math.ceil(hi * 100) / 100) + " por mês, começando no mês 2 e reajustado pela inflação.";
+    } catch (e) { out.textContent = e.message; }
+  }
   async function refreshData() {
     const button = $("refreshData");
     button.disabled = true; button.textContent = "Consultando...";
@@ -170,7 +194,7 @@
       if (!response.ok) throw new Error("Não foi possível consultar os dados publicados.");
       const data = await response.json();
       if (data.price > 0 && data.dividend > 0) {
-        lastMarketData = data;
+        lastMarketData = data; toggleAvg();
         try { localStorage.removeItem("mxrf11-manual"); } catch (_) {}
         $("price").value = Number(data.price).toFixed(2);
         $("dividend").value = Number(data.dividend).toFixed(3);
@@ -190,17 +214,31 @@
   document.querySelectorAll(".tab").forEach(button => button.addEventListener("click", () => setScenario(button.dataset.tab)));
   $("downloadCsv").addEventListener("click", downloadCsv);
   $("refreshData").addEventListener("click", refreshData);
+  $("use12m").addEventListener("click", useAvg);
+  $("planBtn").addEventListener("click", planGoal);
   loadSettings();
   render();
   fetch("./data.json", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(data => {
     if (data && data.price > 0 && data.dividend > 0) {
-      lastMarketData = data;
+      lastMarketData = data; toggleAvg();
       let manual = false; try { manual = !!localStorage.getItem("mxrf11-manual"); } catch (_) {}
       if (!manual) { $("price").value = Number(data.price).toFixed(2); $("dividend").value = Number(data.dividend).toFixed(3); render(); }
       $("dataStatus").textContent = (manual ? "Valores editados por você · publicados: " : "Dados publicados: ") + dateTime(data.updatedAt) + (data.source ? " · Fonte: " + data.source : "");
     }
   }).catch(() => {});
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-    window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
+    window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").then(reg => {
+      reg.addEventListener("updatefound", () => {
+        const w = reg.installing;
+        if (w) w.addEventListener("statechange", () => {
+          if (w.state === "installed" && navigator.serviceWorker.controller) {
+            const b = document.createElement("div"); b.className = "update-banner";
+            b.innerHTML = "Nova versão disponível. <button type='button'>Atualizar</button>";
+            b.querySelector("button").onclick = () => location.reload();
+            document.body.appendChild(b);
+          }
+        });
+      });
+    }).catch(() => {}));
   }
 })();

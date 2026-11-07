@@ -1,4 +1,4 @@
-const CACHE_NAME = "mxrf11-magico-v2";
+const CACHE_NAME = "mxrf11-magico-v3";
 const CORE = ["./", "./index.html", "./manifest.json", "./style.css", "./calculator.js", "./charts.js", "./app.js", "./icon.svg", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./apple-touch-icon.png", "./data.json"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()));

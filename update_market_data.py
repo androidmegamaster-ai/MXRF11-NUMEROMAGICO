@@ -32,6 +32,14 @@ def yahoo():
     divs = sorted(res.get("events", {}).get("dividends", {}).values(), key=lambda d: d["date"], reverse=True)
     return float(res["meta"]["regularMarketPrice"]), float(divs[0]["amount"])
 
+def yahoo_avg12():
+    import time
+    u = "https://query1.finance.yahoo.com/v8/finance/chart/MXRF11.SA?range=1y&interval=1d&events=div"
+    with urlopen(Request(u, headers={"User-Agent": "Mozilla/5.0"}), timeout=25) as r:
+        res = json.loads(r.read())["chart"]["result"][0]
+    vals = [d["amount"] for d in res.get("events", {}).get("dividends", {}).values() if d["date"] > time.time() - 366 * 86400]
+    return sum(vals) / len(vals) if len(vals) >= 6 else None
+
 def valid(price, dividend):
     return bool(price and dividend and 3 < price < 30 and 0.01 < dividend < 1)
 
@@ -70,12 +78,20 @@ def main():
             "data.json foi preservado; revise o parser ou atualize manualmente."
         )
 
+    try:
+        avg12 = yahoo_avg12()
+    except Exception:
+        avg12 = None
+    if avg12 is not None and not (0.01 < avg12 < 1):
+        avg12 = None
+
     br_tz = timezone(timedelta(hours=-3))
     updated = datetime.now(br_tz).isoformat(timespec="seconds")
     data = {
         "ticker": "MXRF11",
         "price": round(price, 2),
         "dividend": round(dividend, 4),
+        "dividend12m": round(avg12, 4) if avg12 else None,
         "updatedAt": updated,
         "source": source,
         "priceSource": url,
