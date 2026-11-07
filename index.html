@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b0d">
+  <meta name="description" content="Simulador educativo de reinvestimento de dividendos do MXRF11 por 360 meses.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MXRF11 Mágico">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <link rel="stylesheet" href="./style.css">
+  <title>MXRF11 · O Número Mágico</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">SIMULADOR DE RENDA PASSIVA</p>
+        <h1>MXRF11 <span>· O Número Mágico</span></h1>
+        <p class="subtitle">Projeção de reinvestimento · 360 meses · 30 anos</p>
+      </div>
+      <span class="status-pill">SIMULAÇÃO EDUCATIVA</span>
+    </header>
+
+    <section class="panel">
+      <div class="section-heading">
+        <h2>Parâmetros do fundo</h2>
+        <span>Valores editáveis</span>
+      </div>
+      <div class="input-grid">
+        <label>Preço da cota (R$)
+          <input id="price" class="money-input" type="number" min="0.01" step="0.01" inputmode="decimal" value="8.80">
+        </label>
+        <label>Dividendo por cota (R$)
+          <input id="dividend" class="money-input" type="number" min="0.001" step="0.001" inputmode="decimal" value="0.10">
+        </label>
+        <label>Cotas desejadas por mês
+          <input id="desiredShares" class="money-input" type="number" min="1" step="1" inputmode="numeric" value="2">
+        </label>
+        <label>Meta de renda mensal (R$)
+          <input id="incomeGoal" class="money-input" type="number" min="0" step="10" inputmode="decimal" value="1000">
+        </label>
+      </div>
+      <div class="data-row">
+        <div>
+          <p id="dataStatus" class="data-status">Dados de referência carregados do projeto.</p>
+          <p class="small muted">Fonte: Status Invest · valores de referência, não cotação em tempo real.</p>
+        </div>
+        <button id="refreshData" class="button button-outline" type="button">↻ Atualizar dados</button>
+      </div>
+      <p class="small muted">A atualização automática depende da execução diária do GitHub Actions e da disponibilidade da fonte. Você também pode editar os campos manualmente. O app não altera os valores digitados sem sua ação.</p>
+    </section>
+
+    <section class="magic-grid">
+      <article class="metric-card">
+        <p>NÚMERO MÁGICO · COTAS</p>
+        <strong id="magicShares">178</strong>
+        <small>Quantidade inicial necessária</small>
+      </article>
+      <article class="metric-card">
+        <p>INVESTIMENTO INICIAL</p>
+        <strong id="initialInvestment">R$ 1.582,42</strong>
+        <small>Compra única de cotas inteiras</small>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="section-heading"><h2>Escolha o cenário</h2><span>Recalcula na hora</span></div>
+      <div class="tabs" role="tablist" aria-label="Cenários da simulação">
+        <button class="tab active" data-tab="nominal" role="tab" aria-selected="true">Nominal</button>
+        <button class="tab" data-tab="inflation" role="tab" aria-selected="false">Inflação</button>
+        <button class="tab" data-tab="contributions" role="tab" aria-selected="false">Aportes</button>
+      </div>
+      <div id="inflationFields" class="conditional-fields hidden">
+        <label>Inflação ao ano (%)
+          <input id="inflation" class="money-input" type="number" min="0" max="100" step="0.1" inputmode="decimal" value="6">
+        </label>
+      </div>
+      <div id="contributionFields" class="conditional-fields hidden">
+        <label>Aporte mensal inicial (R$)
+          <input id="monthlyContribution" class="money-input" type="number" min="0" step="10" inputmode="decimal" value="250">
+        </label>
+        <p class="small muted">O aporte começa no mês 2. É reajustado uma vez por ano: ano 1 = valor inicial; ano 2 = valor inicial + inflação; e assim sucessivamente.</p>
+      </div>
+    </section>
+
+    <section class="goal-panel" aria-live="polite">
+      <p class="eyebrow">SUA META DE RENDA</p>
+      <strong id="goalMessage">Calculando...</strong>
+      <div class="progress" aria-hidden="true"><i id="goalBar"></i></div>
+      <p id="goalDetail" class="small muted"></p>
+    </section>
+
+    <section>
+      <div class="section-heading">
+        <h2>Resumo do cenário</h2>
+        <span>Mês 360</span>
+      </div>
+      <div id="summaryCards" class="summary-grid"></div>
+    </section>
+
+    <section class="panel">
+      <div class="section-heading"><h2>Gráficos</h2><span>Toque ou passe o dedo sobre a linha</span></div>
+      <div class="chart-grid">
+        <figure><figcaption>Evolução do patrimônio (R$)</figcaption><canvas id="chWealth"></canvas></figure>
+        <figure><figcaption>Quantidade de cotas</figcaption><canvas id="chShares"></canvas></figure>
+        <figure><figcaption>Dividendos mensais (R$)</figcaption><canvas id="chIncome"></canvas></figure>
+        <figure id="chRealBox"><figcaption>Patrimônio nominal × real (R$)</figcaption><canvas id="chReal"></canvas></figure>
+      </div>
+    </section>
+
+    <section class="table-section">
+      <div class="table-toolbar">
+        <div>
+          <h2>Evolução mês a mês</h2>
+          <p class="small muted">360 meses · deslize horizontalmente para ver todas as colunas.</p>
+        </div>
+        <button id="downloadCsv" class="button button-primary" type="button">↓ Baixar CSV desta aba</button>
+      </div>
+      <div class="legend">
+        <span><i class="legend-record"></i> Novo recorde de compra</span>
+        <span><i class="legend-goal"></i> Mês da meta</span>
+      </div>
+      <div class="table-wrap">
+        <table id="simulationTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="small muted table-note">As cotas compradas em um mês só passam a render no mês seguinte. A sobra é arredondada para centavos e carregada para o mês seguinte. O patrimônio considera o preço constante informado.</p>
+    </section>
+
+    <section class="panel sources">
+      <h2>Fontes e atualização</h2>
+      <p class="small">Referência para cotação e rendimentos: <a href="https://statusinvest.com.br/fundos-imobiliarios/mxrf11" target="_blank" rel="noopener">Status Invest · MXRF11</a>.</p>
+      <p class="small">A rotina agendada está configurada para 09:00 no horário de Brasília (12:00 UTC). O GitHub Actions pode iniciar com atraso e depende de o repositório ter o workflow habilitado. Se a fonte mudar sua estrutura ou bloquear a consulta, o arquivo de dados anterior será preservado e você poderá editar os valores manualmente.</p>
+    </section>
+
+    <footer>Simulação educativa. Fundos imobiliários são renda variável; preço e dividendos mudam. Não é recomendação de investimento.</footer>
+  </div>
+  <script src="./calculator.js"></script>
+  <script src="./charts.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

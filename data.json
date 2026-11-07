@@ -1,0 +1,10 @@
+{
+  "ticker": "MXRF11",
+  "price": 8.8,
+  "dividend": 0.1,
+  "updatedAt": "2026-11-06T18:03:00-03:00",
+  "source": "Status Invest / referência pública consultada",
+  "priceSource": "https://statusinvest.com.br/fundos-imobiliarios/mxrf11",
+  "dividendSource": "https://statusinvest.com.br/fundos-imobiliarios/mxrf11",
+  "note": "Valor inicial de referência. Confirme a data e o valor do último rendimento anunciado antes de investir."
+}
